@@ -1,0 +1,64 @@
+[project]
+name = "multi-agentic-system"
+version = "0.1.0"
+description = "A multi-agent AI system built on pydantic-ai with a FastAPI backend and Next.js frontend."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    # ── Agent System ──────────────────────────────────────────────────────────
+    # core agent framework
+    "pydantic-ai>=0.0.14",
+    # settings / config
+    "pydantic-settings>=2.0",
+    "python-dotenv>=1.0",
+    # rich console and coloured logging
+    "rich>=13.0",
+    # agent prompt templates
+    "jinja2>=3.1",
+    # retry with exponential backoff
+    "tenacity>=8.2",
+
+    # ── Vector Store ──────────────────────────────────────────────────────────
+    "chromadb>=0.5",
+    # openai SDK — embeddings + health check
+    "openai>=1.0",
+
+    # ── Tools ─────────────────────────────────────────────────────────────────
+    # web search
+    "tavily-python>=0.3",
+    # remote code execution sandbox
+    "e2b-code-interpreter>=1.0",
+
+    # ── Observability ─────────────────────────────────────────────────────────
+    "logfire>=4.32.1",
+
+    # ── API ───────────────────────────────────────────────────────────────────
+    "fastapi>=0.115",
+    # uvicorn[standard] includes websockets + uvloop for production performance
+    "uvicorn[standard]>=0.30",
+]
+
+[dependency-groups]
+
+# Document ingestion — PDF support
+pdf = [
+    "pypdf>=4.0",
+]
+
+# Persistent conversation history across processes
+redis = [
+    "redis>=5.0",
+]
+
+# Development tooling
+dev = [
+    # testing
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    # httpx is required by FastAPI's TestClient
+    "httpx>=0.27",
+    # linting and formatting
+    "ruff>=0.4",
+    # type checking
+    "mypy>=1.10",
+]
