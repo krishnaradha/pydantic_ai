@@ -9,6 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { clearHistory, streamQuery } from "@/lib/api";
 import type { QueryResponse, HistoryMessage } from "@/lib/types";
 
+// generateId() only exists in secure contexts (HTTPS or localhost) —
+// this app is also served over plain http://<ip> in some deployments, where
+// it's undefined and throws. These ids are only used as local React keys,
+// so a simple non-cryptographic fallback is fine.
+function generateId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return generateId();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -62,11 +73,11 @@ export function ChatPanel({
     setError(null);
 
     const userMsg: Message = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       role: "user",
       content: query,
     };
-    const assistantId = crypto.randomUUID();
+    const assistantId = generateId();
     const assistantMsg: Message = {
       id: assistantId,
       role: "assistant",
