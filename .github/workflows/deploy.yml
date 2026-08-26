@@ -54,9 +54,7 @@ jobs:
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
           mkdir -p /opt/app && cd /opt/app
           aws ssm get-parameters-by-path --path /multi-agentic --with-decryption --output json > /tmp/params.json
-          python3 -c "import json; d = json.load(open('/tmp/params.json')); open('.env', 'w').write(chr(10).join(p['Name'].split('/')[-1] + '=' + p['Value'] for p in d['Parameters']))"
-          echo "ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}" >> .env
-          echo "IMAGE_TAG=${{ github.sha }}" >> .env
+          python3 -c "import json; d = json.load(open('/tmp/params.json')); lines = [p['Name'].split('/')[-1] + '=' + p['Value'] for p in d['Parameters']]; lines.append('ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}'); lines.append('IMAGE_TAG=${{ github.sha }}'); open('.env', 'w').write(chr(10).join(lines) + chr(10))"
           docker-compose -f docker-compose.deploy.yml pull
           docker-compose -f docker-compose.deploy.yml up -d
           DEPLOY_EOF
