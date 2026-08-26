@@ -1,33 +1,78 @@
 services:
 
-  # ── FastAPI backend ──────────────────────────────────────────────────────────
+  # ── Nginx load balancer ───────────────────────────────────────────────────────
+  #
+  # Sits in front of all api replicas and distributes requests using least-conn.
+  # The frontend and any external client should call :8000 (this nginx), never
+  # the api containers directly.
+  #
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8000:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ── FastAPI backend (replicated) ──────────────────────────────────────────────
+  #
+  # Runs 2 replicas by default.
+  #
+  # To scale manually at runtime:
+  #   docker compose up --scale api=4
+  #
+  # To set a permanent default, change "replicas: 2" below.
+  #
+  # For auto-scaling in production, remove the "deploy" block and use one of:
+  #   • Docker Swarm:  docker stack deploy -c docker-compose.yml <stack>
+  #                    (set deploy.replicas + update_config.parallelism)
+  #   • Kubernetes:    convert with kompose, then set HorizontalPodAutoscaler
+  #                    (kubectl autoscale deployment api --min=2 --max=10 --cpu-percent=60)
+  #   • AWS ECS:       set desired_count in the task definition + target-tracking
+  #                    scaling policy on the ECS service
+  #
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
+    # No "ports" here — traffic comes through nginx, not directly
+    expose:
+      - "8000"
     env_file:
       - .env
     environment:
       REDIS_URL: redis://redis:6379
       CORS_ORIGINS: http://localhost:3000
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000   # internal container port — 8001 is only for host access
     volumes:
-      - chroma_data:/app/data/chroma
-      - traces_data:/app/data/traces
-      - ./docs:/app/docs:ro          # mount local docs folder read-only
+      - traces_data:/app/data/traces   # shared across all replicas
+      - ./docs:/app/docs:ro
     depends_on:
       redis:
         condition: service_healthy
+      chromadb:
+        condition: service_started    # chromadb has no reliable healthcheck — api retries internally
     restart: unless-stopped
+    deploy:
+      replicas: 2          # ← change this number to set the default replica count
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
+      interval: 5m
       timeout: 10s
       retries: 3
       start_period: 20s
 
-  # ── Next.js frontend ─────────────────────────────────────────────────────────
+  # ── Next.js frontend ──────────────────────────────────────────────────────────
+  #
+  # Calls the API through nginx (:8000), not the api containers directly.
+  # NEXT_PUBLIC_API_URL is baked in at build time — rebuild the image if changed.
+  #
   webapp:
     build:
       context: ./webapp
@@ -37,10 +82,32 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - api
+      - nginx
     restart: unless-stopped
 
-  # ── Redis (persistent conversation history) ───────────────────────────────────
+  # ── ChromaDB (vector store) ───────────────────────────────────────────────────
+  #
+  # Single instance — ChromaDB does not support multi-writer replication.
+  # All api replicas connect to this shared instance via HttpClient.
+  # No healthcheck — the api layer retries the connection internally with
+  # exponential backoff (see vector_store.py _connect_http).
+  #
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+    restart: unless-stopped
+
+  # ── Redis (conversation history) ──────────────────────────────────────────────
+  #
+  # Single instance shared across all api replicas.
+  # For HA Redis in production, switch to Redis Sentinel or Redis Cluster.
+  #
   redis:
     image: redis:7-alpine
     ports:
@@ -56,6 +123,6 @@ services:
       retries: 3
 
 volumes:
-  chroma_data:
-  traces_data:
-  redis_data:
+  chroma_data:   # owned by chromadb — persists embeddings across restarts
+  traces_data:   # shared across api replicas — all write to the same JSONL files
+  redis_data:    # owned by redis — persists conversation history

@@ -71,6 +71,48 @@ class VectorStoreBuilder:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
 
+    async def _connect_http(self, host: str, port: int) -> chromadb.ClientAPI:
+        """Connect to a remote ChromaDB server, retrying until it is ready.
+
+        Args:
+            host: ChromaDB server hostname.
+            port: ChromaDB server port.
+
+        Returns:
+            Connected :class:`chromadb.ClientAPI` instance.
+
+        Raises:
+            VectorStoreError: If the server is unreachable after all retries.
+        """
+        max_attempts = 10
+        delay = 2.0
+        for attempt in range(1, max_attempts + 1):
+            try:
+                # HttpClient() constructor never raises — it just creates the object.
+                # Call heartbeat() immediately to verify the server is actually reachable.
+                client = await _run(
+                    CHROMA_TIMEOUT,
+                    chromadb.HttpClient,
+                    host=host,
+                    port=port,
+                )
+                await _run(CHROMA_TIMEOUT, client.heartbeat)
+                logger.info("Connected to ChromaDB at %s:%d", host, port)
+                return client
+            except Exception as exc:
+                if attempt == max_attempts:
+                    raise VectorStoreError(
+                        f"Could not connect to ChromaDB at {host}:{port} "
+                        f"after {max_attempts} attempts: {exc}"
+                    ) from exc
+                logger.warning(
+                    "ChromaDB not ready (attempt %d/%d) — retrying in %.0fs: %s",
+                    attempt, max_attempts, delay, exc,
+                )
+                await asyncio.sleep(delay)
+                delay = min(delay * 1.5, 15.0)
+        raise VectorStoreError("Unreachable")  # pragma: no cover
+
     async def build(
         self,
         docs_path: str | Path,
@@ -78,21 +120,30 @@ class VectorStoreBuilder:
     ) -> Collection:
         """Return a ChromaDB collection, loading from cache when available.
 
+        Uses :class:`chromadb.HttpClient` when ``settings.chroma_host`` is set
+        (Docker / remote deployments), otherwise falls back to
+        :class:`chromadb.PersistentClient` for local development.
+
         Args:
             docs_path: Root directory to scan recursively for documents.
-            cache_path: Directory where ChromaDB persists the index.
+            cache_path: Directory where ChromaDB persists the index (local only).
 
         Returns:
             A ready-to-query ChromaDB ``Collection``.
 
         Raises:
-            DocumentNotFoundError: If no supported files exist on a cache miss.
             VectorStoreError: On unrecoverable ChromaDB failures.
             asyncio.TimeoutError: If a ChromaDB operation exceeds the timeout.
         """
-        client: chromadb.ClientAPI = await _run(
-            CHROMA_TIMEOUT, chromadb.PersistentClient, path=str(cache_path)
-        )
+        if self._settings.chroma_host:
+            client: chromadb.ClientAPI = await self._connect_http(
+                self._settings.chroma_host,
+                self._settings.chroma_port,
+            )
+        else:
+            client = await _run(
+                CHROMA_TIMEOUT, chromadb.PersistentClient, path=str(cache_path)
+            )
         embedding_fn = OpenAIEmbeddingFunction(
             api_key=self._settings.openai_api_key.get_secret_value(),
             model_name=self._settings.embed_model,

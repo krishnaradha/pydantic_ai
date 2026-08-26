@@ -42,9 +42,16 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   function scrollToBottom() {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // ScrollArea renders an internal viewport div — scroll that directly
+    const viewport = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]");
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }
 
   async function handleSend() {
@@ -125,7 +132,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full border rounded-xl overflow-hidden bg-background">
+    <div className="flex flex-col h-full min-h-0 border rounded-xl overflow-hidden bg-background">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
@@ -146,7 +153,7 @@ export function ChatPanel({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4 py-4">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 min-h-0 px-4 py-4">
         <div className="flex flex-col gap-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm gap-2">

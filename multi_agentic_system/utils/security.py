@@ -35,6 +35,7 @@ _INJECTION_PATTERNS: list[re.Pattern[str]] = [
     ]
 ]
 
+
 _SHELL_PATTERNS: list[re.Pattern[str]] = [
     re.compile(p, re.IGNORECASE)
     for p in [

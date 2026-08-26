@@ -22,7 +22,13 @@ env/
 
 # ── Data & runtime artifacts ──────────────────────────────────────────────────
 data/
-docs/
+
+# ── Local-only docs (contain account/instance IDs, not for the repo) ──────────
+docs/aws-resource-status.md
+
+# ── Personal scratch notes ──────────────────────────────────────────────────
+notes.md
+sample.txt
 
 # ── Tooling caches ─────────────────────────────────────────────────────────────
 .pytest_cache/

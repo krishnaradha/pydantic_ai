@@ -140,6 +140,8 @@ class Settings(BaseSettings):
 
     llm_model: str = LLMModel.GPT4O
     embed_model: str = EmbedModel.TEXT_EMBEDDING_3_SMALL
+    chroma_host: str | None = None  # if set, uses HttpClient instead of PersistentClient
+    chroma_port: int = 8000
 
     chunk_size: int = Field(default=400, ge=10)
     chunk_overlap: int = Field(default=80, ge=0)

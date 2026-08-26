@@ -14,7 +14,7 @@ export default function ChatPage() {
   const [lastResult, setLastResult] = useState<QueryResponse | null>(null);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-8rem)]">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full min-h-0">
       {/* Left — chat */}
       <ChatPanel
         userId={DEFAULT_USER}
@@ -23,7 +23,7 @@ export default function ChatPage() {
       />
 
       {/* Right — metrics */}
-      <div className="flex flex-col gap-4 overflow-y-auto">
+      <div className="flex flex-col gap-4 overflow-y-auto min-h-0">
         {!lastResult ? (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
             Metrics will appear here after the first response.

@@ -49,7 +49,7 @@ export function HealthPanel() {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["health"],
     queryFn: getHealth,
-    refetchInterval: 30_000,
+    refetchInterval: 300_000,
   });
 
   return (

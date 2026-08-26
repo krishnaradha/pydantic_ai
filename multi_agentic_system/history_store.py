@@ -92,6 +92,29 @@ def _deserialise(raw: str) -> list[ModelMessage]:
     return ModelMessagesTypeAdapter.validate_json(raw)
 
 
+def _trim(messages: list[ModelMessage], max_messages: int) -> list[ModelMessage]:
+    """Trim to last *max_messages*, ensuring history starts at a clean turn boundary.
+
+    History alternates: ModelRequest (user/tool-return) → ModelResponse (assistant).
+    A naive tail-slice can orphan a ModelRequest that contains only ToolReturnParts
+    (no UserPromptPart), because its preceding ModelResponse with tool_calls was
+    sliced away. OpenAI rejects this with a 400: 'tool' message must follow
+    'tool_calls'. We advance past any leading tool-only requests until we reach
+    one that starts with a user prompt.
+    """
+    from pydantic_ai.messages import ModelRequest, UserPromptPart  # noqa: PLC0415
+
+    trimmed = messages[-max_messages:]
+    while trimmed:
+        first = trimmed[0]
+        if isinstance(first, ModelRequest) and any(
+            isinstance(p, UserPromptPart) for p in first.parts
+        ):
+            break
+        trimmed = trimmed[1:]
+    return trimmed
+
+
 class InMemoryHistoryStore:
     """Thread-safe in-process history store backed by a plain dict.
 
@@ -128,7 +151,7 @@ class InMemoryHistoryStore:
     ) -> None:
         lock = await self._lock(user_id)
         async with lock:
-            self._store[user_id] = messages[-max_messages:]
+            self._store[user_id] = _trim(messages, max_messages)
             logger.debug(
                 "History updated for %s: %d messages retained",
                 user_id,
@@ -217,7 +240,7 @@ class RedisHistoryStore:
         max_messages: int,
     ) -> None:
         client = self._assert_connected()
-        trimmed = messages[-max_messages:]
+        trimmed = _trim(messages, max_messages)
         payload = _serialise(trimmed)
         if self._ttl:
             await client.setex(self._key(user_id), self._ttl, payload)
