@@ -50,28 +50,33 @@ jobs:
 
       - name: Deploy via SSM Run Command
         run: |
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploy multi-agentic-system ${{ github.sha }}" \
-            --parameters commands="$(cat <<EOF
+          cat > /tmp/deploy.sh <<'DEPLOY_EOF'
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
           mkdir -p /opt/app && cd /opt/app
-          aws ssm get-parameters-by-path --path /multi-agentic --with-decryption --query "Parameters[].{Name:Name,Value:Value}" --output json > /tmp/params.json
-          python3 -c "
-          import json
-          with open('/tmp/params.json') as f:
-              params = json.load(f)
-          with open('.env', 'w') as f:
-              for p in params:
-                  f.write(p['Name'].split('/')[-1] + '=' + p['Value'] + chr(10))
-          "
+          aws ssm get-parameters-by-path --path /multi-agentic --with-decryption --output json > /tmp/params.json
+          python3 -c "import json; d = json.load(open('/tmp/params.json')); open('.env', 'w').write(chr(10).join(p['Name'].split('/')[-1] + '=' + p['Value'] for p in d['Parameters']))"
           echo "ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}" >> .env
           echo "IMAGE_TAG=${{ github.sha }}" >> .env
           docker compose -f docker-compose.deploy.yml pull
           docker compose -f docker-compose.deploy.yml up -d
-          EOF
-          )" \
+          DEPLOY_EOF
+
+          # Build the SSM parameters file via Python so the multi-line script
+          # is safely JSON-encoded — avoids the AWS CLI shorthand "--parameters
+          # commands=..." parser choking on embedded quotes.
+          python3 -c "
+          import json
+          with open('/tmp/deploy.sh') as f:
+              lines = f.read().splitlines()
+          with open('/tmp/ssm_params.json', 'w') as f:
+              json.dump({'commands': lines}, f)
+          "
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy multi-agentic-system ${{ github.sha }}" \
+            --parameters file:///tmp/ssm_params.json \
             --query "Command.CommandId" --output text)
 
           echo "SSM command: $COMMAND_ID"
