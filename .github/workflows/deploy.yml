@@ -57,10 +57,6 @@ jobs:
           python3 -c "import json; d = json.load(open('/tmp/params.json')); lines = [p['Name'].split('/')[-1] + '=' + p['Value'] for p in d['Parameters']]; lines.append('ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}'); lines.append('IMAGE_TAG=${{ github.sha }}'); open('.env', 'w').write(chr(10).join(lines) + chr(10))"
           docker-compose -f docker-compose.deploy.yml pull
           docker-compose -f docker-compose.deploy.yml up -d
-          # nginx doesn't re-resolve the api container's DNS name after it's
-          # recreated with a new IP — restart it unconditionally so a stale
-          # upstream never causes a 502 after api/webapp get new images.
-          docker-compose -f docker-compose.deploy.yml restart nginx
           DEPLOY_EOF
 
           # Build the SSM parameters file via Python so the multi-line script
