@@ -322,3 +322,51 @@ cd webapp && npm install && npm run dev
 | `REDIS_URL` | No | Redis connection URL (in-memory history if omitted) |
 | `CORS_ORIGINS` | No | Comma-separated allowed origins (default: `http://localhost:3000`) |
 | `NEXT_PUBLIC_API_URL` | No | API base URL baked into the frontend build (default: `http://localhost:8000`) |
+
+---
+
+## AWS Deployment
+
+A $0 (free-tier) deployment — one EC2 instance, images built by CI/CD and
+pulled from ECR, exposed directly via the instance's Elastic IP. Full
+design rationale: [docs/aws-architecture.md](docs/aws-architecture.md).
+
+**Setting this up from scratch in your own AWS account?** Start at
+[END_TO_END_SETUP.md](END_TO_END_SETUP.md) — the complete, linear,
+copy-paste path from `git clone` to a live deployment.
+
+**First-time setup**, from an empty AWS account — explained step by step in
+[docs/tutorials/aws/](docs/tutorials/aws/README.md), or automated as scripts:
+
+```bash
+# 1. Create every AWS resource (IAM, ECR, security group, EC2, Elastic IP, S3)
+export AWS_REGION=ap-south-1
+./scripts/aws-create-resources.sh
+
+# 2. Set real application secrets (the script above can't know these)
+aws ssm put-parameter --region $AWS_REGION --name /multi-agentic/OPENAI_API_KEY --type SecureString --value "sk-..."
+aws ssm put-parameter --region $AWS_REGION --name /multi-agentic/TAVILY_API_KEY --type SecureString --value "tvly-..."
+aws ssm put-parameter --region $AWS_REGION --name /multi-agentic/E2B_API_KEY --type SecureString --value "e2b_..."
+
+# 3. Wire CI/CD to AWS and push the deploy files onto the instance
+export EC2_INSTANCE_ID=... ECR_REGISTRY=... PUBLIC_API_URL=... \
+       AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... GITHUB_REPO=owner/repo
+./scripts/aws-integrate.sh
+
+# 4. Ship it
+git push origin main
+```
+
+Each script prints the env vars the next one needs — see their header
+comments, or the tutorials, for the full list and what each one does.
+
+**Day to day**, once it's set up:
+
+| Script | Purpose |
+|---|---|
+| [scripts/aws-up.sh](scripts/aws-up.sh) | Start the EC2 instance back up after stopping it, and make sure containers are running |
+| `aws ec2 stop-instances --instance-ids <id>` | Stop the instance to pause billing between uses |
+| `git push origin main` | Redeploy — GitHub Actions builds, pushes to ECR, and deploys automatically |
+
+See [docs/tutorials/aws/integration/end-to-end-setup.md](docs/tutorials/aws/integration/end-to-end-setup.md)
+for a troubleshooting table of every real failure hit building this pipeline.

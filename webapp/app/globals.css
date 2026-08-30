@@ -55,8 +55,8 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: #0d9488;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -66,7 +66,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: #0d9488;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -81,6 +81,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Ambient accent for the background constellation + glass tint. Separate
+     from --primary (teal) so the background keeps its violet/teal duo
+     regardless of brand-color changes. Plain hex (not oklch) so it can be
+     read directly as a canvas fillStyle. */
+  --glow: #6d56f2;
+  --glow-rgb: 109, 86, 242;
+  --glow-2: #14b8a6;
 }
 
 .dark {
@@ -90,8 +98,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: #2dd4bf;
+  --primary-foreground: #052e2b;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -101,7 +109,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: #2dd4bf;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -115,6 +123,10 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --glow: #8f7bff;
+  --glow-rgb: 143, 123, 255;
+  --glow-2: #2dd4bf;
 }
 
 @layer base {
@@ -124,5 +136,73 @@
   html,
   body {
     @apply h-full font-sans bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Frosted-glass surface used by Card and other panels — lets the
+     constellation background show through instead of a flat fill. */
+  .glass-surface {
+    background-color: color-mix(in oklch, var(--card) 50%, transparent);
+    background-image: linear-gradient(
+      160deg,
+      color-mix(in oklch, var(--glow) 10%, transparent),
+      transparent 55%
+    );
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+  }
+
+  /* Large soft color fields behind the constellation canvas — without
+     these the page reads as flat white/black with a few faint dots on
+     top; these give it actual ambient color and a sense of depth. Three
+     blobs, one centered, so the tint reaches where the panels actually
+     sit rather than only the far corners. */
+  .ambient-glow {
+    position: absolute;
+    border-radius: 9999px;
+    background: var(--glow);
+    filter: blur(90px);
+    opacity: 0.32;
+    will-change: transform;
+  }
+  .ambient-glow-1 {
+    width: 52vw;
+    height: 52vw;
+    top: -14vw;
+    left: -12vw;
+    animation: ambient-drift-1 26s ease-in-out infinite;
+  }
+  .ambient-glow-2 {
+    width: 44vw;
+    height: 44vw;
+    bottom: -16vw;
+    right: -10vw;
+    background: var(--glow-2);
+    opacity: 0.24;
+    animation: ambient-drift-2 32s ease-in-out infinite;
+  }
+  .ambient-glow-3 {
+    width: 40vw;
+    height: 40vw;
+    top: 22vh;
+    left: 30vw;
+    opacity: 0.22;
+    animation: ambient-drift-3 38s ease-in-out infinite;
+  }
+  @keyframes ambient-drift-1 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(6vw, 5vw); }
+  }
+  @keyframes ambient-drift-2 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(-5vw, -6vw); }
+  }
+  @keyframes ambient-drift-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-4vw, 4vw) scale(1.08); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ambient-glow { animation: none; }
   }
 }

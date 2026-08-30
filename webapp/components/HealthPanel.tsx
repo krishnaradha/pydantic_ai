@@ -2,11 +2,68 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { CircleCheck, CircleX, RefreshCw, Loader2 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  Cell,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getHealth } from "@/lib/api";
-import type { ServiceStatus } from "@/lib/types";
+import type { HealthResponse, ServiceStatus } from "@/lib/types";
+
+function LatencyChart({ data }: { data: HealthResponse }) {
+  const rows = data.services
+    .filter((s) => s.latency_ms != null)
+    .map((s) => ({
+      name: s.name,
+      latency: s.latency_ms as number,
+      ok: s.ok,
+    }))
+    .sort((a, b) => b.latency - a.latency);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div style={{ height: Math.max(70, rows.length * 26) }} className="mb-3">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          layout="vertical"
+          data={rows}
+          margin={{ top: 4, right: 40, bottom: 4, left: 0 }}
+          barCategoryGap={4}
+        >
+          <XAxis type="number" hide />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={72}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            className="capitalize"
+          />
+          <Tooltip
+            formatter={(value) => `${Number(value).toFixed(0)} ms`}
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+          />
+          <Bar dataKey="latency" radius={4} maxBarSize={14}>
+            {rows.map((r, i) => (
+              <Cell key={i} fill={r.ok ? "#22c55e" : "#ef4444"} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 function ServiceRow({ svc }: { svc: ServiceStatus }) {
   return (
@@ -100,11 +157,18 @@ export function HealthPanel() {
         )}
 
         {data && (
-          <div className="divide-y">
-            {data.services.map((svc) => (
-              <ServiceRow key={svc.name} svc={svc} />
-            ))}
-          </div>
+          <>
+            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+              Latency
+            </p>
+            <LatencyChart data={data} />
+            <Separator className="mb-1" />
+            <div className="divide-y">
+              {data.services.map((svc) => (
+                <ServiceRow key={svc.name} svc={svc} />
+              ))}
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

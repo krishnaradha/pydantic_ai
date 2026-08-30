@@ -2,6 +2,15 @@
 
 import { User, Bot, Wrench, ArrowUpFromLine } from "lucide-react";
 import {
+  BarChart,
+  Bar,
+  Cell,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
+import {
   Table,
   TableBody,
   TableCell,
@@ -19,29 +28,89 @@ import type { StateStep, StepType } from "@/lib/types";
 
 const STEP_CONFIG: Record<
   StepType,
-  { icon: React.ReactNode; label: string; badge: string }
+  { icon: React.ReactNode; label: string; badge: string; hex: string }
 > = {
   user_message: {
     icon: <User className="w-3.5 h-3.5" />,
     label: "User",
     badge: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+    hex: "#06b6d4",
   },
   llm_response: {
     icon: <Bot className="w-3.5 h-3.5" />,
     label: "LLM",
     badge: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    hex: "#3b82f6",
   },
   tool_call: {
     icon: <Wrench className="w-3.5 h-3.5" />,
     label: "Tool Call",
     badge: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+    hex: "#eab308",
   },
   tool_result: {
     icon: <ArrowUpFromLine className="w-3.5 h-3.5" />,
     label: "Tool Result",
     badge: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    hex: "#22c55e",
   },
 };
+
+// ---------------------------------------------------------------------------
+// Timeline chart — duration_ms per step; steps with no recorded duration
+// (e.g. user_message) get a hairline marker instead of a bar.
+// ---------------------------------------------------------------------------
+
+function StepTimeline({ steps }: { steps: StateStep[] }) {
+  // The backend doesn't populate duration_ms on every run yet — showing a
+  // chart with a handful of real values mixed into an all-null run would
+  // render as a misleading wall of equal-width bars. Only render once every
+  // step in this run has a real duration; otherwise the table below (which
+  // already renders "—" per null) carries the info alone.
+  const allTimed = steps.every((s) => s.duration_ms != null);
+  if (!allTimed) return null;
+
+  const data = steps.map((s) => ({
+    label: `${s.index}. ${STEP_CONFIG[s.step_type].label}`,
+    duration: s.duration_ms as number,
+    hex: STEP_CONFIG[s.step_type].hex,
+  }));
+
+  const height = Math.max(90, data.length * 26);
+
+  return (
+    <div style={{ height }} className="mb-3">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          layout="vertical"
+          data={data}
+          margin={{ top: 4, right: 12, bottom: 4, left: 0 }}
+          barCategoryGap={4}
+        >
+          <XAxis type="number" hide />
+          <YAxis
+            type="category"
+            dataKey="label"
+            width={100}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 10.5, fill: "var(--muted-foreground)" }}
+          />
+          <Tooltip
+            formatter={(value) => `${Number(value).toFixed(0)} ms`}
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+          />
+          <Bar dataKey="duration" radius={3} maxBarSize={12}>
+            {data.map((d, i) => (
+              <Cell key={i} fill={d.hex} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 const PREVIEW_CHARS = 120;
 
@@ -69,7 +138,9 @@ export function StateFlowTable({ steps }: StateFlowTableProps) {
   }
 
   return (
-    <ScrollArea className="max-h-[420px] rounded-md border">
+    <div>
+      <StepTimeline steps={steps} />
+      <ScrollArea className="max-h-[420px] rounded-md border">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40">
@@ -112,6 +183,7 @@ export function StateFlowTable({ steps }: StateFlowTableProps) {
           })}
         </TableBody>
       </Table>
-    </ScrollArea>
+      </ScrollArea>
+    </div>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/lib/providers";
 import { NavBar } from "@/components/NavBar";
+import { ConstellationBackground } from "@/components/ConstellationBackground";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,11 +31,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="h-full flex flex-col overflow-hidden">
+          <ConstellationBackground />
           <Providers>
-            <NavBar />
-            <main className="flex-1 overflow-hidden max-w-7xl w-full mx-auto px-4 py-6">
-              {children}
-            </main>
+            <div className="relative z-10 flex flex-col h-full">
+              <NavBar />
+              <main className="flex-1 overflow-hidden max-w-7xl w-full mx-auto px-4 py-6">
+                {children}
+              </main>
+            </div>
           </Providers>
         </body>
     </html>

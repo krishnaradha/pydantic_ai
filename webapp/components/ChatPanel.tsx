@@ -9,13 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { clearHistory, streamQuery } from "@/lib/api";
 import type { QueryResponse, HistoryMessage } from "@/lib/types";
 
-// generateId() only exists in secure contexts (HTTPS or localhost) —
+// crypto.randomUUID() only exists in secure contexts (HTTPS or localhost) —
 // this app is also served over plain http://<ip> in some deployments, where
 // it's undefined and throws. These ids are only used as local React keys,
 // so a simple non-cryptographic fallback is fine.
 function generateId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return generateId();
+    return crypto.randomUUID();
   }
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
@@ -143,7 +143,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 border rounded-xl overflow-hidden bg-background">
+    <div className="glass-surface flex flex-col h-full min-h-0 border border-[var(--glow)]/20 rounded-xl overflow-hidden shadow-lg shadow-[var(--glow)]/10">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
